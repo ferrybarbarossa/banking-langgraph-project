@@ -1,0 +1,850 @@
+# SPEC.md 1.1
+
+**Project:** Compliance-Aware SEC Filing Analyst
+**Status:** Specification — pre-implementation
+**Owner:** Mohamed (Ferry) Erouk
+**Last updated:** 2026-05-13
+**Revision:** v1.2 — hybrid retrieval, retrieval traceability, enterprise refinement
+
+---
+
+# 1. Purpose
+
+A LangGraph-based multi-agent system that answers natural-language questions about US public company filings retrieved from SEC EDGAR.
+
+Retrieval is hybrid:
+
+1. the system first locates the relevant filing section structurally
+2. then performs semantic retrieval within that bounded section using a local vector store
+
+Every answer is cited, every model call is logged, and every output passes through a compliance review before being returned. When compliance flags an output, the graph pauses for human review.
+
+This project exists to demonstrate how governed AI workflows can combine:
+
+* retrieval-augmented generation (RAG)
+* structured reasoning
+* compliance review
+* auditability
+* human oversight
+* evaluation discipline
+* stateful orchestration
+
+in a banking-relevant domain.
+
+The workflow intentionally requires:
+
+* branching logic
+* state persistence
+* compliance gating
+* interrupt/resume behavior
+* iterative revision loops
+* human escalation
+
+making graph-based orchestration appropriate.
+
+It is **not** intended for:
+
+* real investment use
+* real client work
+* production banking deployment
+* operation on proprietary financial data
+
+---
+
+# 2. Non-Goals
+
+The following are deliberately out of scope:
+
+* Investment advice or recommendations of any kind
+* Real-time market data, pricing, or analyst forecasts
+* Comparison or aggregation across multiple companies in a single answer
+* Forward-looking projections beyond what is stated in the source filing
+* Any integration with proprietary or licensed data sources
+* A user interface beyond a CLI demo
+* Multi-user authentication or authorization
+* Production deployment
+* Enterprise authorization models
+* Production-scale observability or MLOps
+
+If any of these are needed later, they require a separate specification.
+
+---
+
+# 3. Users and Use Cases
+
+## Primary user
+
+An informed technical reviewer (engineering manager, AI lead, interviewer) evaluating the author's command of:
+
+* hybrid RAG architectures
+* LangGraph orchestration
+* governed AI workflows
+* evaluation discipline
+* compliance-aware AI patterns
+
+Secondary users may include analysts using the demo to retrieve information from public filings.
+
+---
+
+## Use cases
+
+| Use case           | Example query                                                      | Expected behavior                                                   |
+| ------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Standard retrieval | "What were Apple's biggest risk disclosures in their latest 10-K?" | Returns cited summary from Risk Factors section                     |
+| Out-of-scope       | "Should I buy Apple stock?"                                        | Compliance flags as investment advice; human review interrupts      |
+| Insufficient data  | "What were Acme Corp's earnings?"                                  | Returns “no data found” gracefully; no hallucination                |
+| Ambiguous          | "Tell me about Apple's debt"                                       | Answer specifies filing and year; does not aggregate across filings |
+| Forward-looking    | "Will Apple grow next quarter?"                                    | Compliance flags; human review                                      |
+| Missing citation   | internal citation failure                                          | Compliance rejects before output                                    |
+
+---
+
+# 4. Functional Requirements
+
+## FR-1 — Natural language query intake
+
+The system accepts a free-form natural language question via CLI.
+
+The query is bounded to 500 characters maximum to reduce:
+
+* prompt-injection surface area
+* accidental oversized prompts
+* unbounded retrieval requests
+
+---
+
+## FR-2 — Filing retrieval
+
+The system retrieves filings from SEC EDGAR using the public REST API at `data.sec.gov`.
+
+Supported filing types:
+
+* 10-K
+* 10-Q
+* 8-K
+
+The retrieval layer:
+
+* respects EDGAR rate limits
+* includes a descriptive User-Agent header
+* supports local filing caching
+
+---
+
+## FR-3 — Multi-agent analysis
+
+The system uses at minimum:
+
+* a **Planner**
+* a **Retrieval Agent**
+* an **Analysis Agent**
+* a **Compliance Reviewer**
+
+Each agent:
+
+* has a role-bounded system prompt
+* returns structured output
+* uses Pydantic validation
+* does not return unrestricted free-form responses
+
+---
+
+## FR-3a — Hybrid retrieval (structural + semantic)
+
+The retrieval pipeline is hybrid.
+
+### Step 1 — Structural retrieval
+
+The Retrieval Agent first identifies the correct filing section structurally.
+
+Examples:
+
+* Item 1A — Risk Factors
+* Management Discussion and Analysis
+* Financial Statements
+
+This bounds the retrieval space deterministically.
+
+### Step 2 — Semantic retrieval
+
+Within the structurally bounded section:
+
+* content is chunked
+* chunks are embedded
+* semantic similarity search retrieves the top-k relevant chunks
+
+The semantic layer operates as follows:
+
+* Chunking uses `RecursiveCharacterTextSplitter`
+* Chunk size defaults to 1000 tokens
+* Overlap defaults to 100 tokens
+* Embeddings use a lightweight local sentence-transformer model
+* Chunks are stored in a query-bounded ephemeral ChromaDB collection
+* Semantic retrieval returns top-k chunks (default k=5)
+* Only top-k retrieved chunks are passed to the Analysis Agent
+
+The hybrid strategy intentionally combines:
+
+* deterministic retrieval boundaries
+* semantic relevance ranking
+
+This improves:
+
+* retrieval precision
+* citation accuracy
+* token efficiency
+* hallucination resistance
+
+while reducing:
+
+* noisy retrievals
+* context-window dilution
+* semantically similar but structurally irrelevant matches
+
+The Analysis Agent may synthesize only from retrieved chunks returned by the retrieval pipeline.
+
+---
+
+## FR-3b — Retrieval traceability
+
+Every retrieved chunk remains traceable throughout the workflow.
+
+Each retrieval result includes:
+
+* accession number
+* filing type
+* filing date
+* section name
+* chunk identifier
+* semantic similarity score
+* retrieval rank
+
+The audit layer records:
+
+* retrieval query
+* metadata filters
+* top-k selection
+* similarity scores
+* selected chunk identifiers
+
+This exists to support:
+
+* auditability
+* reproducibility
+* retrieval-grounded generation
+* compliance defensibility
+
+---
+
+## FR-3c — Filing cache
+
+Retrieved filings are cached locally after first retrieval to:
+
+* reduce SEC EDGAR load
+* improve evaluation reproducibility
+* reduce latency
+* reduce repeated retrieval cost
+* support deterministic replay during debugging
+
+Cached filings are treated as immutable snapshots during a single evaluation run.
+
+---
+
+## FR-4 — Citation enforcement
+
+Every factual claim in the final answer must include a citation pointing to:
+
+* filing
+* section
+* chunk
+* page when available
+
+Claims without citations are rejected by the compliance layer.
+
+---
+
+## FR-5 — Compliance review
+
+Every draft answer passes through a Compliance Reviewer before being returned.
+
+The reviewer operates in two layers:
+
+### Layer 1 — Deterministic checks
+
+Examples:
+
+* investment-advice detection
+* missing citations
+* unsupported company references
+* excessive response length
+* forward-looking language
+
+### Layer 2 — LLM judge
+
+Used only for ambiguous cases.
+
+Compliance verdicts are:
+
+* `pass`
+* `flag_for_human`
+* `reject`
+
+---
+
+## FR-6 — Human-in-the-loop interrupt
+
+When compliance returns `flag_for_human`:
+
+* the graph pauses using LangGraph interrupts
+* the CLI displays:
+
+  * draft answer
+  * triggered rules
+  * reviewer reasoning
+* a reviewer may:
+
+  * approve
+  * reject
+
+On reject:
+
+* the graph loops back to Analysis Agent
+* reviewer feedback is injected into state
+
+---
+
+## FR-7 — State persistence
+
+The graph uses `SqliteSaver` for checkpoint persistence.
+
+State persists at every node boundary.
+
+This enables:
+
+* interrupt/resume behavior
+* replayability
+* debugging
+* evaluation reproducibility
+
+---
+
+## FR-8 — Audit trail
+
+Every model call writes a structured audit entry.
+
+Audit entries include:
+
+* timestamp
+* node name
+* model identifier
+* token counts
+* retrieval query
+* retrieved chunk identifiers
+* similarity scores
+* retrieval rank ordering
+* compliance rule triggers
+* revision counts
+* human-review decisions
+* retry paths
+
+Audit logs are written as JSONL.
+
+In production, this would route to centralized observability infrastructure.
+
+---
+
+## FR-9 — Evaluation harness
+
+A pytest-based evaluation harness runs the graph against a fixed evaluation suite.
+
+The evaluation suite asserts properties, not exact output strings.
+
+Evaluation covers:
+
+* retrieval correctness
+* citation correctness
+* hallucination prevention
+* compliance behavior
+* interrupt behavior
+* audit completeness
+
+The eval harness acts as a release gate for:
+
+* prompt changes
+* model changes
+* retrieval changes
+* policy changes
+
+---
+
+# 5. Non-Functional Requirements
+
+## NFR-1 — Reproducibility
+
+Given:
+
+* the same input query
+* the same model version
+* the same filing snapshot
+
+The audit trail must allow reconstruction of graph execution.
+
+Reproducibility is a load-bearing system property.
+
+---
+
+## NFR-2 — Latency
+
+A standard query should complete in under 60 seconds on a developer machine.
+
+This is a soft target.
+
+Correctness and traceability take priority over latency.
+
+---
+
+## NFR-3 — Cost
+
+A single query should cost under $0.20 using Claude Sonnet.
+
+A full eval run should cost under $5.
+
+These are discipline constraints, not hard guarantees.
+
+---
+
+## NFR-4 — Maintainability
+
+The system enforces separation of concerns.
+
+Requirements:
+
+* prompts stored separately
+* policies stored separately
+* independently testable nodes
+* graph wiring isolated from business logic
+* retrieval isolated from orchestration
+* audit layer isolated from node logic
+
+---
+
+## NFR-5 — Documentation
+
+A stranger must be able to:
+
+* clone the repo
+* install dependencies
+* configure environment variables
+* run the demo
+* execute evals
+
+within approximately 10 minutes.
+
+README must include:
+
+* purpose
+* install instructions
+* architecture overview
+* example queries
+* environment variables
+* evaluation instructions
+
+---
+
+## NFR-6 — Retrieval evaluation quality
+
+Retrieval quality is treated as a first-class system concern.
+
+Metrics include:
+
+* citation correctness
+* chunk relevance
+* retrieval precision
+* unsupported-claim rate
+* hallucination rate
+* semantic retrieval stability
+
+The evaluation harness validates:
+
+* final answers
+* retrieval evidence quality
+* retrieval grounding consistency
+
+---
+
+# 6. Architecture
+
+## 6.1 Graph topology
+
+```text
+        User Query
+             │
+             ▼
+         Planner
+             │
+             ▼
+     Retrieval Agent
+   (structural retrieval)
+             │
+             ▼
+    Semantic Retrieval
+ (chunk + embed + top-k)
+             │
+             ▼
+      Analysis Agent
+             │
+             ▼
+    Compliance Reviewer
+       ┌─────┼─────┐
+       │     │     │
+      pass  flag  reject
+       │     │     │
+       ▼     ▼     ▼
+    Output Human  loop
+            Review back
+```
+
+---
+
+## 6.2 State schema
+
+```python
+from typing import TypedDict, Optional, List, Literal
+
+class FilingChunk(TypedDict):
+    chunk_id: str
+    accession_number: str
+    filing_type: str
+    filing_date: str
+    section: str
+    text: str
+    page: int
+
+class ScoredChunk(TypedDict):
+    chunk: FilingChunk
+    similarity_score: float
+    retrieval_rank: int
+
+class Citation(TypedDict):
+    chunk_id: str
+    accession_number: str
+    section: str
+    page: int
+
+class RetrievalPlan(TypedDict):
+    ticker: str
+    filing_type: Literal["10-K", "10-Q", "8-K"]
+    sections: List[str]
+    reasoning: str
+
+class ComplianceVerdict(TypedDict):
+    verdict: Literal["pass", "flag_for_human", "reject"]
+    triggered_rules: List[str]
+    reasoning: str
+
+class AuditEntry(TypedDict):
+    timestamp: str
+    node: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    notes: str
+
+class AgentState(TypedDict):
+    user_query: str
+    plan: Optional[RetrievalPlan]
+    retrieved_chunks: List[FilingChunk]
+    top_k_chunks: List[ScoredChunk]
+    draft_answer: Optional[str]
+    citations: List[Citation]
+    compliance_result: Optional[ComplianceVerdict]
+    human_decision: Optional[Literal["approve", "reject"]]
+    human_feedback: Optional[str]
+    revision_count: int
+    final_answer: Optional[str]
+    audit_log: List[AuditEntry]
+```
+
+---
+
+## 6.3 Node contracts
+
+| Node                | Input                           | Output                  |
+| ------------------- | ------------------------------- | ----------------------- |
+| planner             | user_query                      | plan                    |
+| retrieval_agent     | plan                            | retrieved_chunks        |
+| semantic_retrieval  | user_query, retrieved_chunks    | top_k_chunks            |
+| analysis_agent      | top_k_chunks                    | draft_answer, citations |
+| compliance_reviewer | draft_answer, citations         | compliance_result       |
+| human_review        | draft_answer, compliance_result | human_decision          |
+| output              | final content                   | final_answer            |
+
+---
+
+## 6.4 Conditional edges
+
+| From                | Condition      | To                 |
+| ------------------- | -------------- | ------------------ |
+| retrieval_agent     | chunks found   | semantic_retrieval |
+| retrieval_agent     | no chunks      | output             |
+| semantic_retrieval  | top-k found    | analysis_agent     |
+| semantic_retrieval  | none found     | output             |
+| compliance_reviewer | pass           | output             |
+| compliance_reviewer | flag_for_human | human_review       |
+| compliance_reviewer | reject         | analysis_agent     |
+| human_review        | approve        | output             |
+| human_review        | reject         | analysis_agent     |
+
+---
+
+## 6.5 Loop protection
+
+The state tracks `revision_count`.
+
+After 3 revisions:
+
+* the graph forces `flag_for_human`
+* further autonomous retries stop
+
+This prevents infinite revision loops.
+
+---
+
+# 7. Tech Stack
+
+| Component                         | Choice                                   | Rationale                                 |
+| --------------------------------- | ---------------------------------------- | ----------------------------------------- |
+| Orchestration                     | langgraph >= 0.2                         | Stateful graph orchestration              |
+| LLM SDK                           | langchain-anthropic                      | Structured-output support                 |
+| Primary model                     | claude-sonnet-4-5                        | Development speed/quality balance         |
+| Demo model                        | claude-opus-4-5                          | Better edge-case reasoning                |
+| Vector store                      | chromadb >= 0.5                          | Lightweight local vector persistence      |
+| Embeddings                        | sentence-transformers (all-MiniLM-L6-v2) | Local low-cost retrieval                  |
+| Enterprise retrieval alternatives | pgvector / Azure AI Search / Pinecone    | Representative production migration paths |
+| Chunking                          | RecursiveCharacterTextSplitter           | Standard retrieval chunking               |
+| Persistence                       | SqliteSaver                              | Local checkpoint persistence              |
+| Validation                        | pydantic >= 2                            | Structured-output enforcement             |
+| Logging                           | structlog                                | Structured audit logging                  |
+| Testing                           | pytest                                   | Evaluation harness                        |
+| Python                            | 3.11+                                    | Modern typing and LangGraph support       |
+
+---
+
+# 8. File Structure
+
+```text
+citi-langgraph-demo/
+├── README.md
+├── SPEC.md
+├── pyproject.toml
+├── .env.example
+├── src/
+│   ├── graph.py
+│   ├── state.py
+│   ├── audit.py
+│   ├── config.py
+│   ├── nodes/
+│   │   ├── planner.py
+│   │   ├── retrieval.py
+│   │   ├── semantic_retrieval.py
+│   │   ├── analysis.py
+│   │   ├── compliance.py
+│   │   ├── human_review.py
+│   │   └── output.py
+│   ├── retrieval/
+│   │   ├── embeddings.py
+│   │   └── vector_store.py
+│   ├── tools/
+│   │   ├── edgar.py
+│   │   └── chunker.py
+│   ├── prompts/
+│   └── policies/
+├── tests/
+│   ├── test_compliance.py
+│   ├── test_semantic_retrieval.py
+│   ├── test_graph.py
+│   └── evals/
+└── examples/
+    └── demo.py
+```
+
+---
+
+# 9. Compliance Rules
+
+## Deterministic rules
+
+| Rule  | Description                        | Action         |
+| ----- | ---------------------------------- | -------------- |
+| C-001 | “buy” / “sell” advice              | flag_for_human |
+| C-002 | investment recommendation language | flag_for_human |
+| C-003 | missing citations                  | reject         |
+| C-004 | forward-looking statements         | flag_for_human |
+| C-005 | unsupported company references     | reject         |
+| C-006 | runaway response length            | reject         |
+
+---
+
+## LLM judge
+
+Used only for ambiguous cases after deterministic checks pass.
+
+The judge returns:
+
+* pass
+* flag_for_human
+* reject
+
+with reasoning.
+
+---
+
+# 10. Prompt Engineering Standards
+
+Requirements:
+
+1. role-bounded prompts
+2. structured outputs
+3. defensive instructions
+4. explicit failure behavior
+5. reasoning isolated from user-visible answers
+6. prompt versioning
+7. evaluation-tracked revisions
+
+Prompt files begin with:
+
+```markdown
+# Prompt: Planner v1.2
+# Last updated: 2026-05-13
+# Eval pass rate: 14/15
+```
+
+---
+
+# 11. Evaluation Strategy
+
+## Eval composition
+
+The evaluation set contains:
+
+* happy-path retrievals
+* investment-advice queries
+* insufficient-data queries
+* ambiguous queries
+* forward-looking queries
+* citation-failure injections
+
+---
+
+## Assertion style
+
+Evaluations assert properties rather than exact strings.
+
+Example:
+
+```yaml
+- compliance_verdict: pass
+- has_citations: true
+- citation_count: ">= 2"
+- answer_word_count: "< 500"
+```
+
+---
+
+## Release gate
+
+No:
+
+* prompt change
+* retrieval change
+* model change
+* policy change
+
+ships without a passing evaluation run.
+
+---
+
+# 12. Build Phases
+
+| Phase | Deliverable                |
+| ----- | -------------------------- |
+| 1     | Graph skeleton             |
+| 2     | EDGAR retrieval tool       |
+| 3     | Planner + retrieval agents |
+| 4     | Hybrid semantic retrieval  |
+| 5     | Analysis agent             |
+| 6     | Compliance reviewer        |
+| 7     | Human-in-the-loop          |
+| 8     | Eval harness               |
+| 9     | README + audit polish      |
+
+Target build time:
+
+11–15 hours over 7–10 days.
+
+---
+
+# 13. Risks and Mitigations
+
+| Risk                     | Mitigation                          |
+| ------------------------ | ----------------------------------- |
+| LangGraph API changes    | Pin versions                        |
+| SEC rate limits          | Local caching                       |
+| Retrieval quality issues | Manual validation + top-k tuning    |
+| Scope creep              | Non-goals section enforced          |
+| Embedding instability    | Local deterministic embeddings      |
+| Stale Chroma collections | Query-bounded ephemeral collections |
+
+---
+
+# 14. What This Project Does NOT Demonstrate
+
+The project intentionally does not demonstrate:
+
+* production MLOps
+* enterprise authorization models
+* production-scale vector infrastructure
+* concurrent multi-user operation
+* adversarial prompt-injection defenses
+* advanced sparse+dense retrieval pipelines
+* retrieval re-ranking
+* enterprise observability stacks
+* domain-authoritative banking compliance
+
+These omissions are intentional.
+
+The project is a bounded reference implementation focused on:
+
+* governed orchestration
+* hybrid retrieval
+* auditability
+* evaluation discipline
+* human-in-the-loop patterns
+
+rather than full banking-platform implementation.
+
+---
+
+# 15. Open Questions
+
+Deferred decisions:
+
+* single-turn vs multi-turn support
+* Streamlit UI vs CLI-only
+* standalone audit schema publication
+
+These do not block implementation.
+
+---
+
+# 16. References
+
+* LangGraph documentation
+* SEC EDGAR developer documentation
+* Anthropic prompt-engineering guidance
+* ChromaDB documentation
+* Sentence-transformers documentation
+
+---
+
+*This specification is the source of truth for the project. Code that conflicts with the spec is wrong by definition unless the specification itself is updated.*
