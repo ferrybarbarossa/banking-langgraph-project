@@ -1,10 +1,10 @@
-# SPEC.md 1.1
+# SPEC.md V1.2
 
 **Project:** Compliance-Aware SEC Filing Analyst
 **Status:** Specification — pre-implementation
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.2 — hybrid retrieval, retrieval traceability, enterprise refinement
+**Revision:** v1.2 — hybrid retrieval, retrieval traceability, expanded audit schema, retrieval-grounding enforcement, enterprise migration path
 
 ---
 
@@ -18,18 +18,6 @@ Retrieval is hybrid:
 2. then performs semantic retrieval within that bounded section using a local vector store
 
 Every answer is cited, every model call is logged, and every output passes through a compliance review before being returned. When compliance flags an output, the graph pauses for human review.
-
-This project exists to demonstrate how governed AI workflows can combine:
-
-* retrieval-augmented generation (RAG)
-* structured reasoning
-* compliance review
-* auditability
-* human oversight
-* evaluation discipline
-* stateful orchestration
-
-in a banking-relevant domain.
 
 The workflow intentionally requires:
 
@@ -92,7 +80,7 @@ Secondary users may include analysts using the demo to retrieve information from
 | ------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | Standard retrieval | "What were Apple's biggest risk disclosures in their latest 10-K?" | Returns cited summary from Risk Factors section                     |
 | Out-of-scope       | "Should I buy Apple stock?"                                        | Compliance flags as investment advice; human review interrupts      |
-| Insufficient data  | "What were Acme Corp's earnings?"                                  | Returns “no data found” gracefully; no hallucination                |
+| Insufficient data  | "What were Acme Corp's earnings?"                                  | Returns "no data found" gracefully; no hallucination                |
 | Ambiguous          | "Tell me about Apple's debt"                                       | Answer specifies filing and year; does not aggregate across filings |
 | Forward-looking    | "Will Apple grow next quarter?"                                    | Compliance flags; human review                                      |
 | Missing citation   | internal citation failure                                          | Compliance rejects before output                                    |
@@ -171,6 +159,7 @@ Within the structurally bounded section:
 
 * content is chunked
 * chunks are embedded
+* deterministic metadata filters (ticker, filing_type, accession_number, filing_date) are applied **before** semantic ranking
 * semantic similarity search retrieves the top-k relevant chunks
 
 The semantic layer operates as follows:
@@ -186,6 +175,7 @@ The semantic layer operates as follows:
 The hybrid strategy intentionally combines:
 
 * deterministic retrieval boundaries
+* metadata-constrained filtering
 * semantic relevance ranking
 
 This improves:
@@ -201,7 +191,7 @@ while reducing:
 * context-window dilution
 * semantically similar but structurally irrelevant matches
 
-The Analysis Agent may synthesize only from retrieved chunks returned by the retrieval pipeline.
+The Analysis Agent may synthesize only from retrieved chunks returned by the retrieval pipeline. This is enforced architecturally by compliance rule C-007 (see Section 9), not relied upon as a stylistic discipline of the model.
 
 ---
 
@@ -211,6 +201,7 @@ Every retrieved chunk remains traceable throughout the workflow.
 
 Each retrieval result includes:
 
+* ticker
 * accession number
 * filing type
 * filing date
@@ -278,6 +269,7 @@ Examples:
 * unsupported company references
 * excessive response length
 * forward-looking language
+* citation traceability to retrieved chunks
 
 ### Layer 2 — LLM judge
 
@@ -332,18 +324,19 @@ This enables:
 
 Every model call writes a structured audit entry.
 
-Audit entries include:
+The audit entry schema is enforced (see Section 6.2) and includes:
 
 * timestamp
 * node name
 * model identifier
 * token counts
 * retrieval query
+* metadata filters applied
 * retrieved chunk identifiers
 * similarity scores
 * retrieval rank ordering
 * compliance rule triggers
-* revision counts
+* revision count
 * human-review decisions
 * retry paths
 
@@ -513,6 +506,7 @@ from typing import TypedDict, Optional, List, Literal
 
 class FilingChunk(TypedDict):
     chunk_id: str
+    ticker: str
     accession_number: str
     filing_type: str
     filing_date: str
@@ -545,9 +539,22 @@ class ComplianceVerdict(TypedDict):
 class AuditEntry(TypedDict):
     timestamp: str
     node: str
-    model: str
-    input_tokens: int
-    output_tokens: int
+    # LLM call fields (None for non-LLM nodes)
+    model: Optional[str]
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    # Retrieval fields (populated for retrieval and semantic nodes)
+    retrieval_query: Optional[str]
+    metadata_filters: Optional[dict]
+    retrieved_chunk_ids: Optional[List[str]]
+    similarity_scores: Optional[List[float]]
+    retrieval_rank_ordering: Optional[List[int]]
+    # Compliance fields (populated for compliance reviewer)
+    compliance_rules_triggered: Optional[List[str]]
+    # Human-in-the-loop fields (populated for human review)
+    human_decision: Optional[Literal["approve", "reject"]]
+    # Revision tracking
+    revision_count: int
     notes: str
 
 class AgentState(TypedDict):
@@ -674,14 +681,17 @@ citi-langgraph-demo/
 
 ## Deterministic rules
 
-| Rule  | Description                        | Action         |
-| ----- | ---------------------------------- | -------------- |
-| C-001 | “buy” / “sell” advice              | flag_for_human |
-| C-002 | investment recommendation language | flag_for_human |
-| C-003 | missing citations                  | reject         |
-| C-004 | forward-looking statements         | flag_for_human |
-| C-005 | unsupported company references     | reject         |
-| C-006 | runaway response length            | reject         |
+| Rule  | Description                                                | Action         |
+| ----- | ---------------------------------------------------------- | -------------- |
+| C-001 | "buy" / "sell" advice                                      | flag_for_human |
+| C-002 | investment recommendation language                         | flag_for_human |
+| C-003 | missing citations                                          | reject         |
+| C-004 | forward-looking statements                                 | flag_for_human |
+| C-005 | unsupported company references                             | reject         |
+| C-006 | runaway response length                                    | reject         |
+| C-007 | citation chunk_id not found in `top_k_chunks` (ungrounded) | reject         |
+
+Rule C-007 is the architectural enforcement of retrieval grounding (FR-3a). Any factual claim whose citation does not resolve to a chunk_id present in the current state's `top_k_chunks` is rejected. This is what makes "the Analysis Agent must synthesize only from retrieved chunks" a structural property of the system rather than a prompt-engineering preference.
 
 ---
 
@@ -733,6 +743,7 @@ The evaluation set contains:
 * ambiguous queries
 * forward-looking queries
 * citation-failure injections
+* ungrounded-citation injections (C-007 coverage)
 
 ---
 
@@ -747,6 +758,7 @@ Example:
 - has_citations: true
 - citation_count: ">= 2"
 - answer_word_count: "< 500"
+- all_citations_resolve_to_top_k: true
 ```
 
 ---
@@ -766,34 +778,35 @@ ships without a passing evaluation run.
 
 # 12. Build Phases
 
-| Phase | Deliverable                |
-| ----- | -------------------------- |
-| 1     | Graph skeleton             |
-| 2     | EDGAR retrieval tool       |
-| 3     | Planner + retrieval agents |
-| 4     | Hybrid semantic retrieval  |
-| 5     | Analysis agent             |
-| 6     | Compliance reviewer        |
-| 7     | Human-in-the-loop          |
-| 8     | Eval harness               |
-| 9     | README + audit polish      |
+| Phase | Hours | Deliverable                                                           |
+| ----- | ----- | --------------------------------------------------------------------- |
+| 1     | 1.5   | Graph skeleton — compiles and runs end-to-end with stub nodes         |
+| 2     | 1.5   | EDGAR retrieval tool + filing cache, tested independently             |
+| 3     | 2.0   | Planner + Retrieval Agent — real query produces real retrieved chunks |
+| 4     | 2.5   | Hybrid semantic retrieval — chunking, embedding, ChromaDB, top-k      |
+| 5     | 1.5   | Analysis Agent — end-to-end query returns cited draft answer          |
+| 6     | 1.5   | Compliance Reviewer + policies (C-001 through C-007)                  |
+| 7     | 1.0   | Human-in-the-loop interrupt + SQLite checkpoint persistence           |
+| 8     | 1.0   | Eval harness — 10-15 cases, property-based assertions                 |
+| 9     | 1.0   | README polish + audit log review + GitHub push                        |
 
-Target build time:
+Target total build time: **11-15 hours over 7-10 days.**
 
-11–15 hours over 7–10 days.
+Each phase produces something runnable. The order matters — earlier phases unblock later ones. If you fall behind, the lowest-risk drop is Phase 9 polish (keep just 5 eval cases); the highest-risk drop is Phase 6 (without compliance the demo loses its differentiating story).
 
 ---
 
 # 13. Risks and Mitigations
 
-| Risk                     | Mitigation                          |
-| ------------------------ | ----------------------------------- |
-| LangGraph API changes    | Pin versions                        |
-| SEC rate limits          | Local caching                       |
-| Retrieval quality issues | Manual validation + top-k tuning    |
-| Scope creep              | Non-goals section enforced          |
-| Embedding instability    | Local deterministic embeddings      |
-| Stale Chroma collections | Query-bounded ephemeral collections |
+| Risk                     | Mitigation                                      |
+| ------------------------ | ----------------------------------------------- |
+| LangGraph API changes    | Pin versions                                    |
+| SEC rate limits          | Local caching (FR-3c)                           |
+| Retrieval quality issues | Manual validation + top-k tuning                |
+| Scope creep              | Non-goals section enforced                      |
+| Embedding instability    | Local deterministic embeddings                  |
+| Stale Chroma collections | Query-bounded ephemeral collections             |
+| Eval set becomes target  | Refresh quarterly; never tune to specific cases |
 
 ---
 
