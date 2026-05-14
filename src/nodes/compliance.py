@@ -45,6 +45,13 @@ def review_compliance(state: AgentState) -> ComplianceVerdict:
     triggered_rules: list[str] = []
     reasoning: list[str] = []
 
+    if state["revision_count"] >= 3:
+        return {
+            "verdict": "flag_for_human",
+            "triggered_rules": ["C-LOOP"],
+            "reasoning": "Revision limit reached; escalating to human review.",
+        }
+
     if _contains_buy_sell_advice(state["user_query"], draft_answer):
         triggered_rules.append("C-001")
         reasoning.append("Query or draft asks for buy/sell/hold advice.")

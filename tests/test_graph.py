@@ -34,7 +34,7 @@ class FakeEdgarClient:
         """
 
 
-def test_phase_6_graph_returns_compliance_review(monkeypatch) -> None:
+def test_phase_7_graph_returns_final_answer_after_compliance_pass(monkeypatch) -> None:
     monkeypatch.setattr(retrieval, "EdgarClient", FakeEdgarClient)
     monkeypatch.setattr(semantic_retrieval, "SentenceTransformerEmbeddingModel", FakeEmbeddingModel)
     _compiled_graph.cache_clear()
@@ -69,6 +69,7 @@ def test_phase_6_graph_returns_compliance_review(monkeypatch) -> None:
         "triggered_rules": [],
         "reasoning": "Deterministic compliance checks passed.",
     }
+    assert result["final_answer"] == result["draft_answer"]
     assert [entry["node"] for entry in result["audit_log"]] == [
         "planner",
         "retrieval_agent",
