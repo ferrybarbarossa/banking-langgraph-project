@@ -1,10 +1,10 @@
 # SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — Phase 3 implemented
+**Status:** Specification — Phase 4 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.4 — Phase 3 planner and structural retrieval path implemented; prior DevOps and release-engineering section retained
+**Revision:** v1.5 — Phase 4 semantic retrieval path implemented; prior DevOps and release-engineering section retained
 
 ---
 
