@@ -622,9 +622,11 @@ This prevents infinite revision loops.
 | Component                         | Choice                                   | Rationale                                 |
 | --------------------------------- | ---------------------------------------- | ----------------------------------------- |
 | Orchestration                     | langgraph >= 0.2                         | Stateful graph orchestration              |
-| LLM SDK                           | langchain-anthropic                      | Structured-output support                 |
-| Primary model                     | claude-sonnet-4-5                        | Development speed/quality balance         |
+| LLM SDKs                          | langchain-anthropic, langchain-openai    | Structured-output support; multi-provider |
+| Primary model (default)           | claude-sonnet-4-5                        | Development speed/quality balance         |
+| Alternative model                 | gpt-5                                    | Selectable via `LLM_PROVIDER=openai`      |
 | Demo model                        | claude-opus-4-5                          | Better edge-case reasoning                |
+| Provider selector                 | `LLM_PROVIDER` env var (`anthropic`/`openai`) | Runtime provider switching via `src/config.py:get_llm` |
 | Vector store                      | chromadb >= 0.5                          | Lightweight local vector persistence      |
 | Embeddings                        | sentence-transformers (all-MiniLM-L6-v2) | Local low-cost retrieval                  |
 | Enterprise retrieval alternatives | pgvector / Azure AI Search / Pinecone    | Representative production migration paths |
