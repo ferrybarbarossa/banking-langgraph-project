@@ -1,10 +1,10 @@
 # SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — Phase 7 implemented
+**Status:** Specification — Phase 8 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.8 — Phase 7 human-review interrupt and SQLite checkpoint persistence implemented
+**Revision:** v1.9 — Phase 8 pytest eval harness with property-based assertions implemented
 
 ---
 
