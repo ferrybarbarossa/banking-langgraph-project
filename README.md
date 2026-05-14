@@ -1,6 +1,6 @@
 # Compliance-Aware SEC Filing Analyst
 
-A LangGraph-based multi-agent system that answers natural-language questions about US public company filings retrieved from SEC EDGAR. Every answer is cited, every model call is logged, and every output passes through a compliance review before being returned.
+A LangGraph-based multi-agent system that answers natural-language questions about US public company filings retrieved from SEC EDGAR. Every answer is cited, retrieval and compliance decisions are audited, and every draft passes through compliance review before delivery.
 
 **This is a reference implementation** — not intended for real investment use, client work, or production deployment.
 
@@ -63,10 +63,10 @@ This improves retrieval precision, citation accuracy, and hallucination resistan
 | Component      | Choice                                   |
 | -------------- | ---------------------------------------- |
 | Orchestration  | LangGraph >= 0.2                         |
-| LLM            | Claude Sonnet 4.5 / Claude Opus 4.5 or GPT-5 (configurable via `LLM_PROVIDER`) |
+| LLM config     | Claude Sonnet 4.5 / Claude Opus 4.5 or GPT-5 (configurable via `LLM_PROVIDER`) |
 | Vector store   | ChromaDB >= 0.5                          |
 | Embeddings     | sentence-transformers (all-MiniLM-L6-v2) |
-| Persistence    | SqliteSaver                              |
+| Persistence    | LangGraph SqliteSaver                    |
 | Validation     | Pydantic >= 2                            |
 | Logging        | structlog                                |
 | Testing        | pytest                                   |
@@ -91,6 +91,12 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+For development and evaluation:
+
+```bash
+pip install -e ".[dev]"
+```
+
 ### Configure
 
 Copy the example environment file and add your API key:
@@ -108,6 +114,7 @@ Required environment variables:
 | `LLM_PROVIDER`       | `anthropic` (default) or `openai` — selects the model provider at runtime  |
 | `ANTHROPIC_MODEL`    | Override default Anthropic model (default `claude-sonnet-4-5`)             |
 | `OPENAI_MODEL`       | Override default OpenAI model (default `gpt-5`)                            |
+| `USER_AGENT`         | Descriptive SEC EDGAR User-Agent string                                    |
 
 ---
 
@@ -118,6 +125,8 @@ Required environment variables:
 ```bash
 python examples/demo.py
 ```
+
+If compliance returns `flag_for_human`, the demo prints the draft, triggered rules, and reviewer reasoning, then asks for an approve/reject decision before resuming the graph from the SQLite checkpoint.
 
 ### Example queries
 
@@ -157,12 +166,20 @@ Run the evaluation harness:
 pytest tests/evals/
 ```
 
+Run the full local release gate:
+
+```bash
+ruff check
+pytest tests/evals/
+pytest tests/
+```
+
 Evaluations assert **properties**, not exact strings:
 
 ```yaml
 - compliance_verdict: pass
 - has_citations: true
-- citation_count: ">= 2"
+- citation_count: ">= 1"
 - answer_word_count: "< 500"
 - all_citations_resolve_to_top_k: true
 ```
@@ -222,10 +239,11 @@ See [SPEC.md §13](SPEC.md) for the full DevOps plan.
 │   ├── prompts/
 │   └── policies/
 ├── tests/
+│   ├── evals/
 │   ├── test_compliance.py
 │   ├── test_semantic_retrieval.py
 │   ├── test_graph.py
-│   └── evals/
+│   └── test_phase7_interrupts.py
 └── examples/
     └── demo.py
 ```
