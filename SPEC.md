@@ -1,10 +1,10 @@
-# SPEC.md V1.2
+# SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — pre-implementation
+**Status:** Specification — Phase 1 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.2 — hybrid retrieval, retrieval traceability, expanded audit schema, retrieval-grounding enforcement, enterprise migration path
+**Revision:** v1.3 — DevOps and release-engineering section added (GitHub Flow with phase branches, eval-gated release, credential and `.gitignore` policy); §13–§16 renumbered to §14–§17
 
 ---
 
@@ -798,7 +798,90 @@ Each phase produces something runnable. The order matters — earlier phases unb
 
 ---
 
-# 13. Risks and Mitigations
+# 13. DevOps and Release Engineering
+
+The project follows a lightweight DevOps discipline appropriate for a solo, phased, portfolio implementation. It exists to make the build phases (§12) auditable end-to-end and to give the evaluation release-gate (§11) a concrete enforcement mechanism.
+
+---
+
+## 13.1 Repository hosting
+
+* GitHub: `ferrybarbarossa/banking-langgraph-project` — public.
+* Default branch: `main`.
+
+---
+
+## 13.2 Git workflow — GitHub Flow with phase branches
+
+Trunk: `main`. Always in a runnable state — every commit on `main` corresponds to a completed phase deliverable as defined in §12.
+
+| Branch type | Naming                              | Example                              |
+| ----------- | ----------------------------------- | ------------------------------------ |
+| Phase work  | `phase/<n>-<slug>`                  | `phase/2-edgar-retrieval`            |
+| Bug fix     | `fix/<slug>`                        | `fix/audit-timestamp-tz`             |
+| Spec/docs   | `docs/<slug>`                       | `docs/clarify-c-007`                 |
+
+Merge style: **squash-merge via pull request**. One commit per phase lands on `main`. This keeps the commit history aligned with the SPEC §12 phase boundaries and makes `git log main` readable as a phase progression.
+
+Phase-boundary tagging: lightweight tags `v0.1-phase1`, `v0.2-phase2`, …, `v1.0` at Phase 9 completion.
+
+Commit message style:
+* First line under 70 characters
+* Body focuses on the *why* rather than the *what*
+* Co-authorship trailers preserved when relevant
+
+---
+
+## 13.3 Release gate
+
+A merge from `phase/*` into `main` requires all of:
+
+1. Passing eval run per §11 — `pytest tests/evals/` green
+2. Unit tests green — `pytest tests/`
+3. Audit entries produced during the eval run conform to the `AuditEntry` schema (§6.2)
+4. SPEC updated in the same PR if behavior, schema, or policy changed
+
+This makes §11's principle — *no prompt, retrieval, model, or policy change ships without a passing evaluation run* — structurally enforceable rather than merely intended.
+
+---
+
+## 13.4 Credentials and identity
+
+* Git push routes through the `gh` credential helper, configured via `gh auth setup-git`. Pushes carry the GitHub account's permissions rather than stored HTTPS credentials, which prevents identity drift when multiple accounts exist on the developer machine.
+* Local `git config user.name` and `user.email` must match the committing GitHub identity. A mismatch shows up as an authorship gap in `git log` (commit author ≠ pushing account) and is treated as a defect.
+
+---
+
+## 13.5 `.gitignore` policy
+
+The repository ignores:
+
+* Python bytecode — `__pycache__/`, `*.py[cod]`
+* Build artifacts — `*.egg-info/`
+* Tool caches — `.pytest_cache/`, `.ruff_cache/`
+* Virtual environments — `.venv/`
+* Secret-bearing files — `.env`
+
+`.env.example` is checked in as the template; `.env` itself is never committed. Bytecode files that escaped a prior commit are removed via `git rm --cached` rather than left in history.
+
+---
+
+## 13.6 Out of scope
+
+Deliberately deferred — appropriate next steps once Phase 9 completes, but outside the bounded scope of this reference implementation:
+
+* CI/CD pipelines (GitHub Actions or other) — the §13.3 release gate is currently enforced manually
+* Pre-commit hooks (ruff, pytest, type checking)
+* Branch protection rules on `main` (required reviews, required status checks)
+* Container builds and deployment automation
+* Secret-scanning tooling beyond `.gitignore` discipline
+* Signed commits and signed tags
+
+These omissions are intentional and consistent with the §14 risk posture.
+
+---
+
+# 14. Risks and Mitigations
 
 | Risk                     | Mitigation                                      |
 | ------------------------ | ----------------------------------------------- |
@@ -812,7 +895,7 @@ Each phase produces something runnable. The order matters — earlier phases unb
 
 ---
 
-# 14. What This Project Does NOT Demonstrate
+# 15. What This Project Does NOT Demonstrate
 
 The project intentionally does not demonstrate:
 
@@ -840,7 +923,7 @@ rather than full banking-platform implementation.
 
 ---
 
-# 15. Open Questions
+# 16. Open Questions
 
 Deferred decisions:
 
@@ -852,7 +935,7 @@ These do not block implementation.
 
 ---
 
-# 16. References
+# 17. References
 
 * LangGraph documentation
 * SEC EDGAR developer documentation

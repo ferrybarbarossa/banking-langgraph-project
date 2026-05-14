@@ -171,6 +171,28 @@ No prompt, retrieval, model, or policy change ships without a passing eval run.
 
 ---
 
+## Development Workflow
+
+The project follows **GitHub Flow with phase branches**, scoped to the build phases defined in SPEC §12.
+
+| Convention      | Choice                                                                  |
+| --------------- | ----------------------------------------------------------------------- |
+| Trunk           | `main` — every commit corresponds to a completed phase deliverable      |
+| Phase branches  | `phase/<n>-<slug>` (e.g., `phase/2-edgar-retrieval`)                    |
+| Other branches  | `fix/<slug>` for bug fixes, `docs/<slug>` for spec/docs updates         |
+| Merge style     | Squash-merge via PR — one commit per phase on `main`                    |
+| Tags            | `v0.1-phase1`, `v0.2-phase2`, …, `v1.0` at Phase 9 completion           |
+| Release gate    | `pytest tests/evals/` green before any merge into `main`                |
+| Auth            | `gh auth setup-git` routes pushes through the GitHub account credential |
+
+The release gate operationalizes the evaluation discipline above: no prompt, retrieval, model, or policy change reaches `main` without a passing eval run.
+
+Out of scope (deferred until after Phase 9): CI/CD, pre-commit hooks, branch protection rules, container builds, signed commits.
+
+See [SPEC.md §13](SPEC.md) for the full DevOps plan.
+
+---
+
 ## Project Structure
 
 ```
