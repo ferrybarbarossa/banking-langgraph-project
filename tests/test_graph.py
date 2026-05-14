@@ -1,5 +1,14 @@
 from src.graph import _compiled_graph, run_graph
-from src.nodes import retrieval
+from src.nodes import retrieval, semantic_retrieval
+
+
+class FakeEmbeddingModel:
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        embeddings: list[list[float]] = []
+        for text in texts:
+            normalized = text.lower()
+            embeddings.append([1.0, 0.0] if "risk" in normalized or "supply chain" in normalized else [0.0, 1.0])
+        return embeddings
 
 
 class FakeEdgarClient:
@@ -25,8 +34,9 @@ class FakeEdgarClient:
         """
 
 
-def test_phase_3_graph_plans_and_retrieves_structural_chunks(monkeypatch) -> None:
+def test_phase_4_graph_plans_retrieves_and_ranks_chunks(monkeypatch) -> None:
     monkeypatch.setattr(retrieval, "EdgarClient", FakeEdgarClient)
+    monkeypatch.setattr(semantic_retrieval, "SentenceTransformerEmbeddingModel", FakeEmbeddingModel)
     _compiled_graph.cache_clear()
 
     result = run_graph("What were Apple's biggest risk disclosures in their latest 10-K?")
@@ -41,4 +51,6 @@ def test_phase_3_graph_plans_and_retrieves_structural_chunks(monkeypatch) -> Non
     assert result["retrieved_chunks"][0]["ticker"] == "AAPL"
     assert result["retrieved_chunks"][0]["section"] == "Item 1A - Risk Factors"
     assert "supply chain" in result["retrieved_chunks"][0]["text"]
-    assert [entry["node"] for entry in result["audit_log"]] == ["planner", "retrieval_agent"]
+    assert len(result["top_k_chunks"]) == 1
+    assert result["top_k_chunks"][0]["retrieval_rank"] == 1
+    assert [entry["node"] for entry in result["audit_log"]] == ["planner", "retrieval_agent", "semantic_retrieval"]

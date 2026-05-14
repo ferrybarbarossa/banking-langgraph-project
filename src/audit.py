@@ -11,6 +11,8 @@ def make_audit_entry(
     retrieval_query: str | None = None,
     metadata_filters: dict | None = None,
     retrieved_chunk_ids: list[str] | None = None,
+    similarity_scores: list[float] | None = None,
+    retrieval_rank_ordering: list[int] | None = None,
 ) -> AuditEntry:
     return {
         "timestamp": datetime.now(UTC).isoformat(),
@@ -21,8 +23,8 @@ def make_audit_entry(
         "retrieval_query": retrieval_query,
         "metadata_filters": metadata_filters,
         "retrieved_chunk_ids": retrieved_chunk_ids,
-        "similarity_scores": None,
-        "retrieval_rank_ordering": None,
+        "similarity_scores": similarity_scores,
+        "retrieval_rank_ordering": retrieval_rank_ordering,
         "compliance_rules_triggered": None,
         "human_decision": None,
         "revision_count": state["revision_count"],
@@ -38,6 +40,8 @@ def append_audit_entry(
     retrieval_query: str | None = None,
     metadata_filters: dict | None = None,
     retrieved_chunk_ids: list[str] | None = None,
+    similarity_scores: list[float] | None = None,
+    retrieval_rank_ordering: list[int] | None = None,
 ) -> list[AuditEntry]:
     return [
         *state["audit_log"],
@@ -48,5 +52,7 @@ def append_audit_entry(
             retrieval_query=retrieval_query,
             metadata_filters=metadata_filters,
             retrieved_chunk_ids=retrieved_chunk_ids,
+            similarity_scores=similarity_scores,
+            retrieval_rank_ordering=retrieval_rank_ordering,
         ),
     ]
