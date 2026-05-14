@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from langgraph.graph import END, StateGraph
 
+from src.nodes.analysis import analysis_agent_node
 from src.nodes.planner import planner_node
 from src.nodes.retrieval import retrieval_agent_node
 from src.nodes.semantic_retrieval import semantic_retrieval_node
@@ -30,10 +31,12 @@ def build_graph() -> object:
     graph_builder.add_node("planner", planner_node)
     graph_builder.add_node("retrieval_agent", retrieval_agent_node)
     graph_builder.add_node("semantic_retrieval", semantic_retrieval_node)
+    graph_builder.add_node("analysis_agent", analysis_agent_node)
     graph_builder.set_entry_point("planner")
     graph_builder.add_edge("planner", "retrieval_agent")
     graph_builder.add_edge("retrieval_agent", "semantic_retrieval")
-    graph_builder.add_edge("semantic_retrieval", END)
+    graph_builder.add_edge("semantic_retrieval", "analysis_agent")
+    graph_builder.add_edge("analysis_agent", END)
     return graph_builder.compile()
 
 

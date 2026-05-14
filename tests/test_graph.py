@@ -34,7 +34,7 @@ class FakeEdgarClient:
         """
 
 
-def test_phase_4_graph_plans_retrieves_and_ranks_chunks(monkeypatch) -> None:
+def test_phase_5_graph_returns_cited_draft_answer(monkeypatch) -> None:
     monkeypatch.setattr(retrieval, "EdgarClient", FakeEdgarClient)
     monkeypatch.setattr(semantic_retrieval, "SentenceTransformerEmbeddingModel", FakeEmbeddingModel)
     _compiled_graph.cache_clear()
@@ -53,4 +53,20 @@ def test_phase_4_graph_plans_retrieves_and_ranks_chunks(monkeypatch) -> None:
     assert "supply chain" in result["retrieved_chunks"][0]["text"]
     assert len(result["top_k_chunks"]) == 1
     assert result["top_k_chunks"][0]["retrieval_rank"] == 1
-    assert [entry["node"] for entry in result["audit_log"]] == ["planner", "retrieval_agent", "semantic_retrieval"]
+    assert result["draft_answer"] is not None
+    assert "supply chain" in result["draft_answer"]
+    assert "[1]" in result["draft_answer"]
+    assert result["citations"] == [
+        {
+            "chunk_id": result["top_k_chunks"][0]["chunk"]["chunk_id"],
+            "accession_number": "0000320193-23-000106",
+            "section": "Item 1A - Risk Factors",
+            "page": 0,
+        }
+    ]
+    assert [entry["node"] for entry in result["audit_log"]] == [
+        "planner",
+        "retrieval_agent",
+        "semantic_retrieval",
+        "analysis_agent",
+    ]
