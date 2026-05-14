@@ -1,10 +1,10 @@
 # SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — Phase 6 implemented
+**Status:** Specification — Phase 7 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.7 — Phase 6 deterministic compliance reviewer and C-001 through C-007 policies implemented
+**Revision:** v1.8 — Phase 7 human-review interrupt and SQLite checkpoint persistence implemented
 
 ---
 

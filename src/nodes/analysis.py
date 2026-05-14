@@ -11,9 +11,14 @@ MAX_DRAFT_WORDS = 500
 
 def analysis_agent_node(state: AgentState) -> dict[str, object]:
     draft_answer, citations = synthesize_cited_answer(state["user_query"], state["top_k_chunks"])
+    revision_count = state["revision_count"]
+    if state["compliance_result"] is not None and state["compliance_result"]["verdict"] == "reject":
+        revision_count += 1
+
     return {
         "draft_answer": draft_answer,
         "citations": citations,
+        "revision_count": revision_count,
         "audit_log": append_audit_entry(
             state,
             node="analysis_agent",
