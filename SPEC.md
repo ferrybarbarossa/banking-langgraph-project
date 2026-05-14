@@ -1,10 +1,10 @@
 # SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — Phase 5 implemented
+**Status:** Specification — Phase 6 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.6 — Phase 5 analysis-agent cited draft path implemented; prior DevOps and release-engineering section retained
+**Revision:** v1.7 — Phase 6 deterministic compliance reviewer and C-001 through C-007 policies implemented
 
 ---
 

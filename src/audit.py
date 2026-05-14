@@ -13,6 +13,7 @@ def make_audit_entry(
     retrieved_chunk_ids: list[str] | None = None,
     similarity_scores: list[float] | None = None,
     retrieval_rank_ordering: list[int] | None = None,
+    compliance_rules_triggered: list[str] | None = None,
 ) -> AuditEntry:
     return {
         "timestamp": datetime.now(UTC).isoformat(),
@@ -25,7 +26,7 @@ def make_audit_entry(
         "retrieved_chunk_ids": retrieved_chunk_ids,
         "similarity_scores": similarity_scores,
         "retrieval_rank_ordering": retrieval_rank_ordering,
-        "compliance_rules_triggered": None,
+        "compliance_rules_triggered": compliance_rules_triggered,
         "human_decision": None,
         "revision_count": state["revision_count"],
         "notes": notes,
@@ -42,6 +43,7 @@ def append_audit_entry(
     retrieved_chunk_ids: list[str] | None = None,
     similarity_scores: list[float] | None = None,
     retrieval_rank_ordering: list[int] | None = None,
+    compliance_rules_triggered: list[str] | None = None,
 ) -> list[AuditEntry]:
     return [
         *state["audit_log"],
@@ -54,5 +56,6 @@ def append_audit_entry(
             retrieved_chunk_ids=retrieved_chunk_ids,
             similarity_scores=similarity_scores,
             retrieval_rank_ordering=retrieval_rank_ordering,
+            compliance_rules_triggered=compliance_rules_triggered,
         ),
     ]
