@@ -1,10 +1,10 @@
 # SPEC.md V1.3
 
 **Project:** Compliance-Aware SEC Filing Analyst
-**Status:** Specification — Phase 1 implemented
+**Status:** Specification — Phase 3 implemented
 **Owner:** Mohamed (Ferry) Erouk
 **Last updated:** 2026-05-13
-**Revision:** v1.3 — DevOps and release-engineering section added (GitHub Flow with phase branches, eval-gated release, credential and `.gitignore` policy); §13–§16 renumbered to §14–§17
+**Revision:** v1.4 — Phase 3 planner and structural retrieval path implemented; prior DevOps and release-engineering section retained
 
 ---
 

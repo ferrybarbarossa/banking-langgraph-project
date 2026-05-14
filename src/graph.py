@@ -2,7 +2,8 @@ from functools import lru_cache
 
 from langgraph.graph import END, StateGraph
 
-from src.audit import append_audit_entry
+from src.nodes.planner import planner_node
+from src.nodes.retrieval import retrieval_agent_node
 from src.state import AgentState
 
 
@@ -23,20 +24,13 @@ def make_initial_state(query: str) -> AgentState:
     }
 
 
-def echo_node(state: AgentState) -> dict[str, object]:
-    answer = f"Echo: {state['user_query']}"
-    return {
-        "draft_answer": answer,
-        "final_answer": answer,
-        "audit_log": append_audit_entry(state, node="echo", notes="Phase 1 echo stub."),
-    }
-
-
 def build_graph() -> object:
     graph_builder = StateGraph(AgentState)
-    graph_builder.add_node("echo", echo_node)
-    graph_builder.set_entry_point("echo")
-    graph_builder.add_edge("echo", END)
+    graph_builder.add_node("planner", planner_node)
+    graph_builder.add_node("retrieval_agent", retrieval_agent_node)
+    graph_builder.set_entry_point("planner")
+    graph_builder.add_edge("planner", "retrieval_agent")
+    graph_builder.add_edge("retrieval_agent", END)
     return graph_builder.compile()
 
 
