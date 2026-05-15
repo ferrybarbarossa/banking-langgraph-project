@@ -4,6 +4,7 @@ from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
 from src.nodes.analysis import analysis_agent_node
 from src.nodes.compliance import compliance_reviewer_node
@@ -103,6 +104,18 @@ def default_checkpointer() -> SqliteSaver:
 
 def run_graph(query: str, *, thread_id: str = "default") -> AgentState:
     return _compiled_graph().invoke(make_initial_state(query), config=thread_config(thread_id))
+
+
+def resume_graph(
+    *,
+    decision: str,
+    feedback: str | None = None,
+    thread_id: str = "default",
+) -> AgentState:
+    return _compiled_graph().invoke(
+        Command(resume={"decision": decision, "feedback": feedback}),
+        config=thread_config(thread_id),
+    )
 
 
 def thread_config(thread_id: str) -> dict[str, dict[str, str]]:
